@@ -28,8 +28,8 @@ ENV DOTNET_USE_POLLING_FILE_WATCHER=true \
 ENV LANG=C.UTF-8 \
     JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk/jre \
     PATH=$PATH:/usr/lib/jvm/java-1.8-openjdk/jre/bin:/usr/lib/jvm/java-1.8-openjdk/bin \
-    JAVA_VERSION=8u111 \
-    JAVA_ALPINE_VERSION=8.111.14-r0
+    JAVA_VERSION=8u181 \
+    JAVA_ALPINE_VERSION=8.181.13-r0
     
 # add a simple script that can auto-detect the appropriate JAVA_HOME value
 # based on whether the JDK or only the JRE is installed
