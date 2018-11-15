@@ -25,6 +25,24 @@ RUN apk add --no-cache --virtual .build-deps \
 ENV DOTNET_USE_POLLING_FILE_WATCHER=true \ 
     # Skip extraction of XML docs - generally not useful within an image/container - helps performance
     NUGET_XMLDOC_MODE=skip
-
-# Trigger first run experience by running arbitrary cmd to populate local package cache
+ENV LANG=C.UTF-8 \
+    JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk/jre \
+    PATH=$PATH:/usr/lib/jvm/java-1.8-openjdk/jre/bin:/usr/lib/jvm/java-1.8-openjdk/bin \
+    JAVA_VERSION=8u111 \
+    JAVA_ALPINE_VERSION=8.111.14-r0
+    
+# add a simple script that can auto-detect the appropriate JAVA_HOME value
+# based on whether the JDK or only the JRE is installed
+RUN set -x \
+    && { \
+		echo '#!/bin/sh'; \
+		echo 'set -e'; \
+		echo; \
+		echo 'dirname "$(dirname "$(readlink -f "$(which javac || which java)")")"'; \
+	} > /usr/local/bin/docker-java-home \
+	&& chmod +x /usr/local/bin/docker-java-home \
+	&& apk add --no-cache \
+		openjdk8-jre="$JAVA_ALPINE_VERSION" \
+	&& [ "$JAVA_HOME" = "$(docker-java-home)" ]
+    
 RUN dotnet help
