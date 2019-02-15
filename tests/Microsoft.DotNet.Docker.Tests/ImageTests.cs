@@ -4,75 +4,58 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
+using static Microsoft.DotNet.Docker.Tests.ImageVersion;
 
 namespace Microsoft.DotNet.Docker.Tests
 {
     public class ImageTests
     {
-        private static readonly string s_repoName = Environment.GetEnvironmentVariable("REPO") ?? GetManifestRepoName();
-        private static readonly bool s_isHttpVerificationDisabled =
-            Environment.GetEnvironmentVariable("DISABLE_HTTP_VERIFICATION") != null;
-        private static readonly bool s_isLocalRun =
-            Environment.GetEnvironmentVariable("LOCAL_RUN") != null;
-        private static readonly bool s_isNightlyRepo = s_repoName.Contains("nightly");
-        private static readonly bool s_isRunningInContainer =
-            Environment.GetEnvironmentVariable("RUNNING_TESTS_IN_CONTAINER") != null;
-
         private static readonly ImageData[] s_linuxTestData =
         {
-            new ImageData { DotNetVersion = "1.0", OsVariant = OS.Jessie, SdkVersion = "1.1" },
-            new ImageData { DotNetVersion = "1.1", OsVariant = OS.Jessie, RuntimeDepsVersion = "1.0" },
-            new ImageData { DotNetVersion = "1.1", OsVariant = OS.Stretch },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.Bionic },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.Alpine37 },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch, Architecture = "arm" },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.Bionic, Architecture = "arm" },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch, IsWeb = true },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.Bionic, IsWeb = true },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.Alpine37, IsWeb = true },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch, Architecture = "arm", IsWeb = true },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.Bionic, Architecture = "arm", IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.Bionic},
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.Alpine38 },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch, Architecture = "arm" },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.Bionic, Architecture = "arm" },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch, IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.Bionic, IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.Alpine38, IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.StretchSlim, SdkOsVariant = OS.Stretch, Architecture = "arm", IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.Bionic, Architecture = "arm", IsWeb = true },
+            new ImageData { Version = V1_0, OS = OS.Jessie,       Arch = Arch.Amd64,    SdkVersion = V1_1 },
+            new ImageData { Version = V1_1, OS = OS.Jessie,       Arch = Arch.Amd64,    RuntimeDepsVersion = V1_0 },
+            new ImageData { Version = V1_1, OS = OS.Stretch,      Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.StretchSlim,  Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.Bionic,       Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.Alpine37,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.StretchSlim,  Arch = Arch.Arm },
+            new ImageData { Version = V2_1, OS = OS.Bionic,       Arch = Arch.Arm },
+            new ImageData { Version = V2_2, OS = OS.StretchSlim,  Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.Bionic,       Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.Alpine38,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.StretchSlim,  Arch = Arch.Arm },
+            new ImageData { Version = V2_2, OS = OS.Bionic,       Arch = Arch.Arm },
+            new ImageData { Version = V3_0, OS = OS.StretchSlim,  Arch = Arch.Amd64 },
+            new ImageData { Version = V3_0, OS = OS.Bionic,       Arch = Arch.Amd64 },
+            new ImageData { Version = V3_0, OS = OS.Alpine38,     Arch = Arch.Amd64 },
+            new ImageData { Version = V3_0, OS = OS.StretchSlim,  Arch = Arch.Arm },
+            new ImageData { Version = V3_0, OS = OS.Bionic,       Arch = Arch.Arm },
+            new ImageData { Version = V3_0, OS = OS.StretchSlim,  Arch = Arch.Arm64 },
+            new ImageData { Version = V3_0, OS = OS.Bionic,       Arch = Arch.Arm64 },
         };
         private static readonly ImageData[] s_windowsTestData =
         {
-            new ImageData { DotNetVersion = "1.0", OsVariant = OS.NanoServerSac2016, SdkVersion = "1.1" },
-            new ImageData { DotNetVersion = "1.1", OsVariant = OS.NanoServerSac2016 },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServerSac2016 },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServer1709 },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServer1803 },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServer1809 },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServerSac2016, IsWeb = true },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServer1709, IsWeb = true },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServer1803, IsWeb = true },
-            new ImageData { DotNetVersion = "2.1", OsVariant = OS.NanoServer1809, IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServerSac2016 },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServer1709 },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServer1803 },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServer1809 },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServerSac2016, IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServer1709, IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServer1803, IsWeb = true },
-            new ImageData { DotNetVersion = "2.2", OsVariant = OS.NanoServer1809, IsWeb = true },
+            new ImageData { Version = V1_0, OS = OS.NanoServerSac2016,  Arch = Arch.Amd64,  SdkVersion = V1_1 },
+            new ImageData { Version = V1_1, OS = OS.NanoServerSac2016,  Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.NanoServerSac2016,  Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.NanoServer1709,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.NanoServer1803,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_1, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.NanoServerSac2016,  Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.NanoServer1709,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.NanoServer1803,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ImageData { Version = V2_2, OS = OS.NanoServer1809,     Arch = Arch.Arm },
+            new ImageData { Version = V3_0, OS = OS.NanoServerSac2016,  Arch = Arch.Amd64 },
+            new ImageData { Version = V3_0, OS = OS.NanoServer1709,     Arch = Arch.Amd64 },
+            new ImageData { Version = V3_0, OS = OS.NanoServer1803,     Arch = Arch.Amd64 },
+            new ImageData { Version = V3_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ImageData { Version = V3_0, OS = OS.NanoServer1809,     Arch = Arch.Arm },
         };
 
         private readonly DockerHelper _dockerHelper;
@@ -84,21 +67,20 @@ namespace Microsoft.DotNet.Docker.Tests
             _outputHelper = outputHelper;
         }
 
-        public static IEnumerable<object[]> GetVerifyImagesData()
+        public static IEnumerable<object[]> GetImageData()
         {
             string archFilterPattern = GetFilterRegexPattern("IMAGE_ARCH_FILTER");
             string osFilterPattern = GetFilterRegexPattern("IMAGE_OS_FILTER");
             string versionFilterPattern = GetFilterRegexPattern("IMAGE_VERSION_FILTER");
 
-            // Filter out test data that does not match the active architecture and version filters.
+            // Filter out test data that does not match the active architecture, os and version filters.
             return (DockerHelper.IsLinuxContainerModeEnabled ? s_linuxTestData : s_windowsTestData)
                 .Where(imageData => archFilterPattern == null
-                    || Regex.IsMatch(imageData.Architecture, archFilterPattern, RegexOptions.IgnoreCase))
+                    || Regex.IsMatch(Enum.GetName(typeof(Arch), imageData.Arch), archFilterPattern, RegexOptions.IgnoreCase))
                 .Where(imageData => osFilterPattern == null
-                    || (imageData.OsVariant != null
-                        && Regex.IsMatch(imageData.OsVariant, osFilterPattern, RegexOptions.IgnoreCase)))
+                    || Regex.IsMatch(imageData.OS, osFilterPattern, RegexOptions.IgnoreCase))
                 .Where(imageData => versionFilterPattern == null
-                    || Regex.IsMatch(imageData.DotNetVersion, versionFilterPattern, RegexOptions.IgnoreCase))
+                    || Regex.IsMatch(imageData.VersionString, versionFilterPattern, RegexOptions.IgnoreCase))
                 .Select(imageData => new object[] { imageData });
         }
 
@@ -109,88 +91,17 @@ namespace Microsoft.DotNet.Docker.Tests
         }
 
         [Theory]
-        [MemberData(nameof(GetVerifyImagesData))]
-        public async Task VerifyImages(ImageData imageData)
+        [MemberData(nameof(GetImageData))]
+        public void VerifySdkImage_PackageCache(ImageData imageData)
         {
-            string appSdkImage = GetIdentifier(imageData.DotNetVersion, "app-sdk");
-
-            try
+            string verifyCacheCommand = null;
+            if (imageData.Version.Major == 1)
             {
-                CreateTestAppWithSdkImage(imageData, appSdkImage);
-
-                if (!imageData.HasNoSdk)
+                if (!imageData.HasSdk)
                 {
-                    VerifySdkImage_PackageCache(imageData);
-
-                    // TODO: Skip running app in arm + web configuration to workaround https://github.com/dotnet/cli/issues/9162
-                    if (!(imageData.IsArm && imageData.IsWeb))
-                    {
-                        await VerifySdkImage_RunApp(imageData, appSdkImage);
-                    }
+                    _outputHelper.WriteLine("No version specific SDK image exists to verify.");
                 }
-
-                await VerifyRuntimeImage_FrameworkDependentApp(imageData, appSdkImage);
-
-                if (DockerHelper.IsLinuxContainerModeEnabled)
-                {
-                    await VerifyRuntimeDepsImage_SelfContainedApp(imageData, appSdkImage);
-                }
-            }
-            finally
-            {
-                _dockerHelper.DeleteImage(appSdkImage);
-            }
-        }
-
-        private void CreateTestAppWithSdkImage(ImageData imageData, string appSdkImage)
-        {
-            // dotnet new, restore, build a new app using the sdk image
-            List<string> buildArgs = new List<string>();
-            buildArgs.Add($"netcoreapp_version={imageData.DotNetVersion}");
-            AddOptionalRestoreArgs(imageData, buildArgs);
-
-            if (!imageData.SdkVersion.StartsWith("1."))
-            {
-                buildArgs.Add($"optional_new_args=--no-restore");
-            }
-
-            buildArgs.Add("template_name=" + GetTestTemplateName(imageData.IsWeb));
-
-            _dockerHelper.Build(
-                dockerfile: $"Dockerfile.{DockerHelper.DockerOS.ToLower()}.testapp",
-                tag: appSdkImage,
-                fromImage: GetDotNetImage(DotNetImageType.SDK, imageData),
-                buildArgs: buildArgs.ToArray());
-        }
-
-        private async Task VerifySdkImage_RunApp(ImageData imageData, string appSdkImage)
-        {
-            try
-            {
-                // dotnet run the new app using the sdk image
-                _dockerHelper.Run(
-                    image: appSdkImage,
-                    command: "dotnet run --no-launch-profile",
-                    detach: imageData.IsWeb,
-                    containerName: appSdkImage);
-
-                if (imageData.IsWeb && !s_isHttpVerificationDisabled)
-                {
-                    await VerifyHttpResponseFromContainer(appSdkImage);
-                }
-            }
-            finally
-            {
-                _dockerHelper.DeleteContainer(appSdkImage);
-            }
-        }
-
-        private void VerifySdkImage_PackageCache(ImageData imageData)
-        {
-            string verifyCacheCommand;
-            if (imageData.DotNetVersion.StartsWith("1."))
-            {
-                if (DockerHelper.IsLinuxContainerModeEnabled)
+                else if (DockerHelper.IsLinuxContainerModeEnabled)
                 {
                     verifyCacheCommand = "test -d /root/.nuget/packages";
                 }
@@ -199,7 +110,7 @@ namespace Microsoft.DotNet.Docker.Tests
                     verifyCacheCommand = "CMD /S /C PUSHD \"C:\\Users\\ContainerAdministrator\\.nuget\\packages\"";
                 }
             }
-            else
+            else if (imageData.Version.Major == 2)
             {
                 if (DockerHelper.IsLinuxContainerModeEnabled)
                 {
@@ -210,255 +121,41 @@ namespace Microsoft.DotNet.Docker.Tests
                     verifyCacheCommand = "CMD /S /C PUSHD \"C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder\"";
                 }
             }
-
-            // Simple check to verify the NuGet package cache was created
-            _dockerHelper.Run(
-                image: GetDotNetImage(DotNetImageType.SDK, imageData),
-                command: verifyCacheCommand,
-                containerName: GetIdentifier(imageData.DotNetVersion, "PackageCache"));
-        }
-
-        private async Task VerifyRuntimeImage_FrameworkDependentApp(ImageData imageData, string appSdkImage)
-        {
-            string frameworkDepAppId = GetIdentifier(imageData.DotNetVersion, "framework-dependent-app");
-            bool isRunAsContainerAdministrator = 
-                String.Equals(OS.NanoServer1709, imageData.OsVariant, StringComparison.OrdinalIgnoreCase)
-                || String.Equals(OS.NanoServer1803, imageData.OsVariant, StringComparison.OrdinalIgnoreCase)
-                || String.Equals(OS.NanoServer1809, imageData.OsVariant, StringComparison.OrdinalIgnoreCase);
-            string publishCmd = GetPublishArgs(imageData);
-
-            try
-            {
-                // Publish the app to a Docker volume using the app's sdk image
-                _dockerHelper.Run(
-                    image: appSdkImage,
-                    command: publishCmd,
-                    containerName: frameworkDepAppId,
-                    volumeName: frameworkDepAppId,
-                    runAsContainerAdministrator: isRunAsContainerAdministrator);
-
-                // Run the app in the Docker volume to verify the runtime image
-                string runtimeImage = GetDotNetImage(
-                    imageData.IsWeb ? DotNetImageType.AspNetCore_Runtime : DotNetImageType.Runtime, imageData);
-                string appDllPath = _dockerHelper.GetContainerWorkPath("testApp.dll");
-                _dockerHelper.Run(
-                    image: runtimeImage,
-                    command: $"dotnet {appDllPath}",
-                    containerName: frameworkDepAppId,
-                    volumeName: frameworkDepAppId,
-                    detach: imageData.IsWeb,
-                    runAsContainerAdministrator: isRunAsContainerAdministrator);
-
-                if (imageData.IsWeb && !s_isHttpVerificationDisabled)
-                {
-                    await VerifyHttpResponseFromContainer(frameworkDepAppId);
-                }
-            }
-            finally
-            {
-                _dockerHelper.DeleteContainer(frameworkDepAppId);
-                _dockerHelper.DeleteVolume(frameworkDepAppId);
-            }
-        }
-
-        private async Task VerifyRuntimeDepsImage_SelfContainedApp(ImageData imageData, string appSdkImage)
-        {
-            string selfContainedAppId = GetIdentifier(imageData.DotNetVersion, "self-contained-app");
-            string rid = GetRuntimeIdentifier(imageData);
-
-            try
-            {
-                // Build a self-contained app
-                List<string> buildArgs = new List<string>();
-                buildArgs.Add($"rid={rid}");
-                AddOptionalRestoreArgs(imageData, buildArgs);
-
-                _dockerHelper.Build(
-                    dockerfile: "Dockerfile.linux.testapp.selfcontained",
-                    tag: selfContainedAppId,
-                    fromImage: appSdkImage,
-                    buildArgs: buildArgs.ToArray());
-
-                try
-                {
-                    // Publish the self-contained app to a Docker volume using the app's sdk image
-                    string publishCmd = GetPublishArgs(imageData, rid);
-                    _dockerHelper.Run(
-                        image: selfContainedAppId,
-                        command: publishCmd,
-                        containerName: selfContainedAppId,
-                        volumeName: selfContainedAppId);
-
-                    // Run the self-contained app in the Docker volume to verify the runtime-deps image
-                    string runtimeDepsImage = GetDotNetImage(DotNetImageType.Runtime_Deps, imageData);
-                    string appExePath = _dockerHelper.GetContainerWorkPath("testApp");
-                    _dockerHelper.Run(
-                        image: runtimeDepsImage,
-                        command: appExePath,
-                        containerName: selfContainedAppId,
-                        detach: imageData.IsWeb,
-                        volumeName: selfContainedAppId);
-
-                    if (imageData.IsWeb && !s_isHttpVerificationDisabled)
-                    {
-                        await VerifyHttpResponseFromContainer(selfContainedAppId);
-                    }
-                }
-                finally
-                {
-                    _dockerHelper.DeleteContainer(selfContainedAppId);
-                    _dockerHelper.DeleteVolume(selfContainedAppId);
-                }
-            }
-            finally
-            {
-                _dockerHelper.DeleteImage(selfContainedAppId);
-            }
-        }
-
-        private async Task VerifyHttpResponseFromContainer(string containerName)
-        {
-            var retries = 30;
-            var url = !s_isRunningInContainer && DockerHelper.IsLinuxContainerModeEnabled
-                ? $"http://localhost:{_dockerHelper.GetContainerHostPort(containerName)}"
-                : $"http://{_dockerHelper.GetContainerAddress(containerName)}";
-
-            using (HttpClient client = new HttpClient())
-            {
-                while (retries > 0)
-                {
-                    retries--;
-                    await Task.Delay(TimeSpan.FromSeconds(2));
-
-                    try
-                    {
-                        using (HttpResponseMessage result = await client.GetAsync(url))
-                        {
-                            _outputHelper.WriteLine($"HTTP {result.StatusCode}\n{(await result.Content.ReadAsStringAsync())}");
-                            result.EnsureSuccessStatusCode();
-                        }
-
-                        return;
-                    }
-                    catch (Exception ex)
-                    {
-                        _outputHelper.WriteLine($"Request to {url} failed - retrying: {ex.ToString()}");
-                    }
-                }
-            }
-
-            throw new TimeoutException($"Timed out attempting to access the endpoint {url} on container {containerName}");
-        }
-
-        private static string GetTestTemplateName(bool isWeb)
-        {
-            return isWeb ? "web" : "console";
-        }
-
-        private static void AddOptionalRestoreArgs(ImageData imageData, List<string> buildArgs)
-        {
-            string optionalRestoreArgs = string.Empty;
-            if (s_isNightlyRepo)
-            {
-                optionalRestoreArgs = "-s https://dotnet.myget.org/F/dotnet-core/api/v3/index.json -s https://api.nuget.org/v3/index.json";
-            }
-
-            if (imageData.DotNetVersion == "1.1")
-            {
-                optionalRestoreArgs += " /p:RuntimeFrameworkVersion=1.1.*";
-            }
-
-            if (optionalRestoreArgs != string.Empty)
-            {
-                buildArgs.Add($"optional_restore_args=\"{optionalRestoreArgs.Trim()}\"");
-            }
-        }
-
-        public string GetDotNetImage(DotNetImageType imageType, ImageData imageData)
-        {
-            string imageVersion;
-            string osVariant;
-            string variantName = Enum.GetName(typeof(DotNetImageType), imageType).ToLowerInvariant().Replace('_', '-');
-
-            switch (imageType)
-            {
-                case DotNetImageType.Runtime:
-                case DotNetImageType.AspNetCore_Runtime:
-                    imageVersion = imageData.DotNetVersion;
-                    osVariant = imageData.OsVariant;
-                    break;
-                case DotNetImageType.Runtime_Deps:
-                    imageVersion = imageData.RuntimeDepsVersion;
-                    osVariant = imageData.OsVariant;
-                    break;
-                case DotNetImageType.SDK:
-                    imageVersion = imageData.SdkVersion;
-                    osVariant = imageData.SdkOsVariant;
-                    break;
-                default:
-                    throw new NotSupportedException($"Unsupported image type '{variantName}'");
-            }
-
-            string imageName = $"{s_repoName}:{imageVersion}-{variantName}-{osVariant}";
-
-            if (imageData.IsArm)
-            {
-                imageName += $"-arm32v7";
-            }
-
-            if (s_isLocalRun)
-            {
-                Assert.True(DockerHelper.ImageExists(imageName), $"`{imageName}` could not be found on disk.");
-            }
             else
             {
-                _dockerHelper.Pull(imageName);
-            }
+                _outputHelper.WriteLine(".NET Core SDK images >= 3.0 don't include a package cache.");
+            } 
 
-            return imageName;
+            if (verifyCacheCommand != null)
+            {
+                // Simple check to verify the NuGet package cache was created
+                _dockerHelper.Run(
+                    image: imageData.GetImage(DotNetImageType.SDK, _dockerHelper),
+                    command: verifyCacheCommand,
+                    name: imageData.GetIdentifier("PackageCache"));
+            }
         }
 
-        private static string GetIdentifier(string version, string type)
+        [Theory]
+        [MemberData(nameof(GetImageData))]
+        public async Task VerifyRuntimeImage_AppScenario(ImageData imageData)
         {
-            return $"{version}-{type}-{DateTime.Now.ToFileTime()}";
+            ImageScenarioVerifier verifier = new ImageScenarioVerifier(imageData, _dockerHelper, _outputHelper);
+            await verifier.Execute();
         }
 
-        private static string GetPublishArgs(ImageData imageData, string rid = null)
+        [Theory]
+        [MemberData(nameof(GetImageData))]
+        public async Task VerifyAspNetCoreRuntimeImage_AppScenario(ImageData imageData)
         {
-            string optionalArgs = imageData.DotNetVersion.StartsWith("1.") ? "" : " --no-restore";
-            optionalArgs += string.IsNullOrEmpty(rid) ? "" : $" -r {rid}";
-            return $"dotnet publish -c Release -o {DockerHelper.ContainerWorkDir}{optionalArgs}";
-        }
-
-        private static string GetManifestRepoName()
-        {
-            string manifestJson = File.ReadAllText("manifest.json");
-            JObject manifest = JObject.Parse(manifestJson);
-            return (string)manifest["repos"][0]["name"];
-        }
-
-        private static string GetRuntimeIdentifier(ImageData imageData)
-        {
-            string rid;
-
-            if (imageData.IsArm)
+            if (imageData.Version.Major == 1)
             {
-                rid = "linux-arm";
-            }
-            else if (imageData.IsAlpine)
-            {
-                rid = "linux-musl-x64";
-            }
-            else if (imageData.DotNetVersion.StartsWith("1."))
-            {
-                rid = imageData.OsVariant == OS.Jessie ? "debian.8-x64" : "debian.9-x64";;
-            }
-            else
-            {
-                rid = "linux-x64";
+                _outputHelper.WriteLine("1.* ASP.NET Core images reside in https://github.com/aspnet/aspnet-docker, skip testing");
+                return;
             }
 
-            return rid;
+            ImageScenarioVerifier verifier = new ImageScenarioVerifier(imageData, _dockerHelper, _outputHelper, isWeb: true);
+            await verifier.Execute();
         }
     }
 }
