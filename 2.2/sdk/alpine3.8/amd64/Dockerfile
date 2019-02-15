@@ -15,8 +15,8 @@ ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     NUGET_XMLDOC_MODE=skip \
     JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk/jre \
     PATH=$PATH:/usr/lib/jvm/java-1.8-openjdk/jre/bin:/usr/lib/jvm/java-1.8-openjdk/bin:/root/.dotnet/tools \
-    JAVA_VERSION=8u181 \
-    JAVA_ALPINE_VERSION=8.181.13-r0
+    JAVA_VERSION=8u191 \
+    JAVA_ALPINE_VERSION=openjdk8-jre-8.191.12-r0
 
 # Disable the invariant mode (set in base image) and install openjdk
 RUN apk add --no-cache icu-libs openjdk8-jre="$JAVA_ALPINE_VERSION"
